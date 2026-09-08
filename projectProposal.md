@@ -1,12 +1,12 @@
 # Project Repository
 
-**GitHub repository:** TODO: Add the URL of the team's GitHub repository.
+# Team and Responsibilities
 
-All source code, configuration files, experiment logs, results, and documentation will be maintained in this repository. Each team member will work through separate branches or assigned issues and submit regular commits and pull requests so that individual contributions remain visible throughout the semester.
+James Zhan is the sole team member. He will dedicate time every week to work on the project and update the GitHub accordingly. 
 
 # Introduction
 
-Object detectors typically process each video frame as an independent still image. This approach is efficient, but it ignores temporal information available in nearby frames. A single frame may contain motion blur, partial occlusion, poor lighting, water reflections, or an object that is too small to recognize reliably. Neighboring frames may provide a clearer view or reveal motion patterns that help distinguish a real object from background noise.
+Object detectors typically process each video frame as an independent still image. This approach is efficient, but it ignores temporal information available in nearby frames. In traffic videos, a single frame may contain motion blur, partial vehicle occlusion, poor lighting, shadows, or a car that is too small to recognize reliably. Neighboring frames may provide a clearer view or reveal motion patterns that help distinguish a vehicle from the road and surrounding background.
 
 This project will compare **single-frame object detection** with **multi-frame object detection**. The single-frame baseline will use one RGB image as input. The multi-frame variants will use short sequences containing 3, 5, or 7 consecutive RGB frames and predict the bounding boxes for the center frame. The main research question is:
 
@@ -16,13 +16,11 @@ This is an ML systems problem because the best model is not necessarily the mode
 
 # Problem Statement
 
-The project focuses on video-based maritime object detection, where targets are often small, distant, partially occluded, or visually similar to waves and reflections. The experimental dataset will be an existing sequence-based maritime dataset assembled from:
+The project focuses on detecting cars and other vehicles in traffic-camera videos. Vehicles may appear small or distant, become partially hidden behind other vehicles, experience motion blur, or be difficult to distinguish under rain, nighttime lighting, shadows, and heavy traffic. These are situations where information from adjacent frames may improve a detector's decision.
 
-- in-house video collected at Lake Murray and Charleston, South Carolina;
-- the Singapore Maritime Dataset, which contains on-shore, on-board, and near-infrared maritime video recorded under multiple environmental conditions [1]; and
-- the LaRS maritime dataset, which provides temporally adjacent frames from diverse lakes, rivers, and seas [2].
+The primary benchmark will be **UA-DETRAC**, a traffic video dataset containing 100 challenging sequences and more than 140,000 annotated frames. It includes approximately 1.21 million vehicle bounding boxes and attributes describing vehicle category, illumination, occlusion, and truncation [1]. The videos contain traffic intersections, highways, and other road settings recorded under conditions such as sunny weather, cloudy weather, rain, and nighttime lighting.
 
-The current organized dataset contains approximately 15,969 training frames, 3,187 validation frames, and 2,818 test frames. These counts may change slightly after final validation and removal of corrupted, duplicate, or incorrectly ordered samples. Data will be split by complete video sequence rather than by individual frame. This prevents nearly identical neighboring frames from appearing in both training and testing and producing overly optimistic results.
+The official UA-DETRAC division contains 60 training sequences and 40 testing sequences. A subset of the training sequences will be reserved for validation. Data will be split by complete video sequence rather than by individual frame. This prevents nearly identical neighboring frames from appearing in both training and testing and producing overly optimistic results. The primary task will treat cars, buses, and vans as a single **vehicle** class so the experiment focuses on temporal input rather than fine-grained vehicle classification. If time permits, BDD100K may be used as an additional generalization dataset because it contains geographically and environmentally diverse driving videos [2].
 
 Each sample will contain an ordered temporal window and the object-detection labels for its center frame. The study will compare four input configurations:
 
@@ -31,11 +29,11 @@ Each sample will contain an ordered temporal window and the object-detection lab
 - 5 RGB frames, or 15 stacked channels; and
 - 7 RGB frames, or 21 stacked channels.
 
-The expected result is that multi-frame models will improve detection of small, blurred, and partially occluded objects because they can use information from adjacent frames. However, additional frames are also expected to increase data-loading cost, inference latency, training time, and GPU-memory usage. Performance may show diminishing returns after a certain number of frames. The goal is to measure these effects rather than assume that more frames are always better.
+The expected result is that multi-frame models will improve detection of small, blurred, and partially occluded vehicles because they can use information from adjacent frames. However, additional frames are also expected to increase data-loading cost, inference latency, training time, and GPU-memory usage. Performance may show diminishing returns after a certain number of frames. The goal is to measure these effects rather than assume that more frames are always better.
 
 # Technical Approach
 
-The project will use a pretrained YOLO object detector as the common detection backbone. YOLO is appropriate because it provides a practical real-time baseline and can be evaluated using both task-quality and system-performance metrics. The implementation will reuse the Ultralytics training and inference pipeline where possible [3].
+The project will use a pretrained YOLO object detector as the common detection backbone. YOLO is appropriate for traffic monitoring because it provides a practical real-time baseline and can be evaluated using both task-quality and system-performance metrics. The implementation will reuse the Ultralytics training and inference pipeline where possible [3].
 
 The single-frame baseline will use the standard three-channel RGB input. For the multi-frame variants, 3, 5, or 7 consecutive frames will be stacked along the channel dimension. A small learnable convolutional input adapter will transform the stacked channels into a three-channel representation that can be passed into the same pretrained detector. This keeps the detector backbone consistent across experiments while allowing the multi-frame system to learn temporal patterns from the input sequence.
 
@@ -59,7 +57,7 @@ The project will not attempt to design a completely new detector, build an objec
 
 1. How does using 3, 5, or 7 frames affect detection quality compared with a single frame?
 2. How much latency, GPU memory, throughput, and training-time overhead does each additional input configuration introduce?
-3. Do multi-frame inputs provide larger improvements for small, blurred, or partially occluded objects?
+3. Do multi-frame inputs provide larger improvements for small, blurred, or partially occluded vehicles?
 4. At what point do additional frames produce diminishing returns?
 5. Which model lies on the best quality-cost trade-off for the available hardware?
 
@@ -91,12 +89,12 @@ The primary summary will be a Pareto plot with detection quality on one axis and
 
 The final report will include side-by-side prediction examples from all four input configurations. Examples will be selected from challenging scenes involving:
 
-- small or distant objects;
+- small or distant vehicles;
 - motion blur;
-- partial occlusion;
-- glare and water reflections;
-- low contrast or poor lighting; and
-- camera movement.
+- partial vehicle occlusion in dense traffic;
+- rain, road glare, and strong shadows;
+- low contrast or nighttime lighting; and
+- crowded intersections and highways.
 
 Example videos will also be generated with synchronized predictions from the single-frame and best-performing multi-frame models. These examples will help explain where temporal information corrects a missed detection, removes a false positive, or fails to improve the result.
 
@@ -118,15 +116,15 @@ Prior video object-detection research has shown that nearby frames can improve a
 
 YOLOV extends a one-stage YOLOX detector to video by selecting useful object regions and aggregating information between target and reference frames. Its authors specifically evaluate both detection accuracy and inference speed, which closely matches the quality-cost focus of this project [6]. More recent work has also investigated a simpler multi-frame YOLO approach that stacks consecutive frames and supervises a target frame. That work reports improved robustness while keeping architectural changes limited [7].
 
-Temporal modeling has also been studied specifically in maritime environments. WaSR-T uses recent frames to learn temporal differences between true obstacles and reflections on water, reducing false positives compared with single-frame maritime methods [8]. LaRS was designed with preceding frames so that temporal texture can be studied in maritime perception [2].
+Temporal modeling has also been studied specifically in traffic environments. A recent spatiotemporal vehicle-detection study introduced a sequential traffic dataset and modified a YOLO-based detector to use temporal information, reporting improvements over a single-frame baseline [7]. UA-DETRAC provides a suitable controlled benchmark for this project because its traffic sequences contain frame-level vehicle boxes and challenging attributes such as occlusion, illumination changes, and truncation [1]. D2-City provides additional evidence that large-scale driving videos with frame-level detection and tracking annotations are useful for studying difficult traffic conditions [8].
 
 This project differs from work proposing a new state-of-the-art video detector. Its contribution is a controlled ML systems study of **how many input frames are worthwhile** when the model, data split, hardware, and evaluation procedure are held constant. The project will jointly report detection quality, robustness, latency, throughput, memory, and training cost so that the result supports an operational model-selection decision.
 
 # References
 
-[1] D. K. Prasad, D. Rajan, L. Rachmawati, E. Rajabally, and C. Quek, “Video Processing From Electro-Optical Sensors for Object Detection and Tracking in a Maritime Environment: A Survey,” *IEEE Transactions on Intelligent Transportation Systems*, 2017. Singapore Maritime Dataset: https://sites.google.com/site/dilipprasad/home/singapore-maritime-dataset
+[1] L. Wen, D. Du, Z. Cai, Z. Lei, M.-C. Chang, H. Qi, J. Lim, M.-H. Yang, and S. Lyu, “UA-DETRAC: A New Benchmark and Protocol for Multi-Object Detection and Tracking,” 2015. https://arxiv.org/abs/1511.04136
 
-[2] L. Žust, J. Perš, and M. Kristan, “LaRS: A Diverse Panoptic Maritime Obstacle Detection Dataset and Benchmark,” 2023. https://arxiv.org/abs/2308.09618
+[2] F. Yu, H. Chen, X. Wang, W. Xian, Y. Chen, F. Liu, V. Madhavan, and T. Darrell, “BDD100K: A Diverse Driving Dataset for Heterogeneous Multitask Learning,” 2018. https://arxiv.org/abs/1805.04687
 
 [3] Ultralytics, “Ultralytics YOLO Documentation and Source Code.” https://github.com/ultralytics/ultralytics
 
@@ -136,6 +134,6 @@ This project differs from work proposing a new state-of-the-art video detector. 
 
 [6] Y. Shi, N. Wang, and X. Guo, “YOLOV: Making Still Image Object Detectors Great at Video Object Detection,” 2022. https://arxiv.org/abs/2208.09686
 
-[7] Y. Quan, B. Kiefer, M. Messmer, and A. Zell, “Lightweight Multi-Frame Integration for Robust YOLO Object Detection in Videos,” 2025. https://arxiv.org/abs/2506.20550
+[7] K. Telegraph and C. Kyrkou, “Spatiotemporal Object Detection for Improved Aerial Vehicle Detection in Traffic Monitoring,” 2024. https://arxiv.org/abs/2410.13616
 
-[8] L. Žust and M. Kristan, “Temporal Context for Robust Maritime Obstacle Detection,” 2022. https://arxiv.org/abs/2203.05352
+[8] Z. Che, G. Li, T. Li, B. Jiang, X. Shi, X. Zhang, Y. Lu, G. Wu, Y. Liu, and J. Ye, “D2-City: A Large-Scale Dashcam Video Dataset of Diverse Traffic Scenarios,” 2019. https://arxiv.org/abs/1904.01975
