@@ -1,0 +1,54 @@
+# Local datasets, including matching folders inside milestones
+BDDK_Dataset/
+BDD100K/
+bdd100k/
+datasets/
+
+# Downloaded dataset archives
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+*.rar
+
+# Model weights and checkpoints
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.engine
+*.safetensors
+
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*~
