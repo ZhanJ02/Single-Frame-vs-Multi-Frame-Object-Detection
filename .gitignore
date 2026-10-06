@@ -3,6 +3,7 @@ BDDK_Dataset/
 BDD100K/
 bdd100k/
 datasets/
+predictions_coco.json
 
 # Downloaded dataset archives
 *.zip
