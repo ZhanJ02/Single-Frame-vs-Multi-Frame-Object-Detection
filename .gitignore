@@ -13,6 +13,22 @@ predictions_coco.json
 *.7z
 *.rar
 
+# Datasets
+DETRAC/
+BDDK_Dataset/
+BDD100K/
+bdd100k/
+
+# Model weights
+*.pt
+*.pth
+
+# Large generated predictions
+predictions_coco.json
+
+# Python cache
+__pycache__/
+*.py[cod]
 # Model weights and checkpoints
 *.pt
 *.pth
