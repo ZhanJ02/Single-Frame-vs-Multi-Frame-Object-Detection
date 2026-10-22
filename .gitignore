@@ -1,9 +1,18 @@
-# Local datasets, including matching folders inside milestones
+# Local datasets
+DETRAC/
 BDDK_Dataset/
 BDD100K/
 bdd100k/
 datasets/
+/MilestoneP1_or_Milestone2/DETRAC/
+
+# Large generated predictions
 predictions_coco.json
+
+# Generated videos
+*.mp4
+*.avi
+*.mov
 
 # Downloaded dataset archives
 *.zip
@@ -13,22 +22,6 @@ predictions_coco.json
 *.7z
 *.rar
 
-# Datasets
-DETRAC/
-BDDK_Dataset/
-BDD100K/
-bdd100k/
-
-# Model weights
-*.pt
-*.pth
-
-# Large generated predictions
-predictions_coco.json
-
-# Python cache
-__pycache__/
-*.py[cod]
 # Model weights and checkpoints
 *.pt
 *.pth
@@ -69,5 +62,3 @@ Desktop.ini
 *.temp
 *.swp
 *~
-
-/MilestoneP1_or_Milestone2/DETRAC/

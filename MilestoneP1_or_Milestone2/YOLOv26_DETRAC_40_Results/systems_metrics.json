@@ -1,0 +1,58 @@
+{
+  "warmup_predictions_excluded": 10,
+  "timed_frames": 41580,
+  "batch_size": 1,
+  "imgsz": 640,
+  "backend_forward_ms": {
+    "mean": 8.47477740739466,
+    "median": 6.891400000313297,
+    "p95": 16.30472000251757,
+    "min": 6.636300000536721,
+    "max": 722.6192999951309
+  },
+  "predict_call_latency_ms": {
+    "mean": 10.937351613762743,
+    "median": 9.238149999873713,
+    "p95": 20.113440001659907,
+    "min": 8.542200004740153,
+    "max": 725.2778000038234
+  },
+  "frame_latency_ms": {
+    "mean": 13.17859247470886,
+    "median": 11.394900000595953,
+    "p95": 23.310515000412124,
+    "min": 10.364100002334453,
+    "max": 727.275199998985
+  },
+  "backend_forward_equivalent_fps": 117.99719944590531,
+  "predict_call_throughput_fps": 91.42981183321153,
+  "frame_processing_throughput_fps": 75.88063762644666,
+  "evaluation_loop_throughput_fps": 74.00583245127058,
+  "evaluation_loop_seconds": 561.8476088000025,
+  "gpu_memory": {
+    "device": "cuda:0",
+    "gpu_name": "NVIDIA GeForce RTX 4060",
+    "gpu_total_mib": 8187.5,
+    "allocated_after_warmup_mib": 110.181640625,
+    "peak_allocated_mib": 158.9990234375,
+    "peak_reserved_mib": 216.0,
+    "peak_allocated_above_warmup_mib": 48.8173828125,
+    "scope": "PyTorch CUDA allocator for this process, measured after warm-up. Includes resident model tensors; excludes other processes, driver allocations and non-PyTorch CUDA allocations. CPU runs report null."
+  },
+  "environment": {
+    "python": "3.12.2",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "torch": "2.5.1+cu121",
+    "ultralytics": "8.4.174",
+    "opencv": "4.11.0",
+    "torch_cuda": "12.1",
+    "backend_fp16": false
+  },
+  "measurement_notes": {
+    "backend_forward": "Ultralytics-reported model forward only. Equivalent FPS is not end-to-end throughput.",
+    "predict_call": "Synchronized wall time for model.predict, including preprocessing, transfers, forward and postprocessing. Disk read and final CPU box copy excluded.",
+    "frame": "Synchronized wall time from disk read/decode through prediction and CPU box copy. Excludes metric matching, AP, output writing and plotting. OS disk cache may be warm.",
+    "evaluation_loop": "Includes frame processing plus Python annotation/matching/collection and progress printing. Excludes warm-up, annotation loading, model loading, final AP and output files.",
+    "comparison": "Serial batch-1 measurement with per-frame synchronization. Use matching hardware, inputs and settings. Temporal capture/buffering delay is not measured."
+  }
+}

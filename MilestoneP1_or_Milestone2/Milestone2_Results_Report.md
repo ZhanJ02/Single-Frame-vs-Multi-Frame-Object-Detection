@@ -1,76 +1,114 @@
 # Milestone 2: Generating and Analyzing Partial Results
-**James Zhan — Single-Frame vs. Multi-Frame Object Detection**
+**James Zhan — Single-Frame vs. Multi-Frame Vehicle Detection**
 
-## Introduction and Experimental Setup
+## Project Goal
 
-The goal of my project is to determine whether using multiple video frames improves vehicle detection enough to justify the additional latency, GPU memory, and computational cost. For this milestone, I implemented and evaluated the single-frame baseline; this establishes the reference point for later temporal-model comparisons.
+My project investigates whether using consecutive video frames improves vehicle detection enough to justify the additional computational cost. The ML component compares single-frame and multi-frame object detection; the systems component measures latency, throughput, and GPU-memory requirements. The main question is whether temporal information provides a useful accuracy–efficiency trade-off for traffic monitoring.
 
-I evaluated pretrained YOLO26m on all 10,000 images in the BDD100K 100k validation split. The evaluation focused on cars rather than combining all vehicle categories. I used the pretrained checkpoint without fine-tuning on BDD100K. Assuming the supplied script defaults were unchanged, inference used an image-size setting of 640; precision, recall, and F1 used confidence 0.25 and matching IoU 0.50. AP used predictions down to confidence 0.001 and a maximum of 300 detections per image. These settings should be confirmed against the saved metrics.json and run command.
+For this milestone, I completed the pretrained YOLO26m baseline and added systems measurements to the evaluation pipeline. The multi-frame comparison is the next stage; no temporal-model results are reported yet.
 
-The results below are car-only COCO-style metrics from my evaluator; they are not official BDD100K leaderboard scores. These are validation results, not official test-set results. Only the single-frame model has been evaluated so far; therefore, these results cannot yet establish whether temporal input improves detection.
+## Dataset and Experimental Setup
 
-## Results Summary
+I initially evaluated the model on 10,000 BDD100K validation images. However, that release contains separate still images rather than ordered neighboring frames. I changed the main experimental dataset to UA-DETRAC so that both models can be evaluated on the same sequential traffic scenes.
+
+The current evaluation selects image-sequence folders beginning with `MVI_40` and loads the matching MATLAB `.mat` annotations. Frames are processed in numerical order within each sequence. Each selected sequence requires a corresponding annotation file; the sequence prefix alone does not determine whether a sequence belongs to the official training or test split.
+
+The baseline uses pretrained **YOLO26m (`yolo26m.pt`)**, without fine-tuning on UA-DETRAC. YOLO processes one frame at a time; processing sequential images does not make the model temporal. The evaluator merges YOLO's car, bus, and truck predictions into one `vehicle` class and compares them with the annotated vehicle boxes.
+
+| Setting | Evaluation-script default |
+|---|---|
+| Model | YOLO26m |
+| Input | One image per prediction |
+| Image-size setting | 640 |
+| Confidence threshold for precision, recall, and F1 | 0.25 |
+| Matching IoU | 0.50 |
+| Low confidence cutoff for AP | 0.001 |
+| Maximum detections per image | 300 |
+| Warm-up | 10 predictions, excluded from timing |
+
+These are the script defaults; the saved run configuration should be used to confirm any command-line overrides. The exact evaluated frame count, sequence list, GPU model, software versions, and inference precision should accompany the final experiment. They were not available in the result summary used for this update, so I have not assigned values to them.
+
+## UA-DETRAC Detection Results
 
 | Metric | Result |
 |---|---:|
-| Validation images | 10,000 |
-| True positives | 52,130 |
-| False positives | 9,609 |
-| False negatives | 50,376 |
-| Precision | 84.44% |
-| Recall | 50.86% |
-| F1 score | 63.48% |
-| AP50 | 64.29% |
-| AP75 | 38.31% |
-| AP50–95 | 38.41% |
-| Mean model inference time | 8.16 ms/image |
+| Precision | 60.85% |
+| Recall | 84.83% |
+| F1 score | 70.87% |
 
-The fixed-threshold confusion matrix has prediction classes as rows and ground-truth classes as columns:
+The baseline detects approximately 85 out of every 100 labeled vehicles; however, only about 61 out of every 100 predictions match a labeled vehicle under the evaluation criteria. This gives a missed-vehicle rate of approximately 15.17% and a false-positive share of approximately 39.15% among predictions. The latter is not the classification false-positive rate, which requires a defined true-negative count.
 
-| Prediction / Ground truth | Car | Background |
-|---|---:|---:|
-| Car | 52,130 | 9,609 |
-| Background | 50,376 | N/A |
+The strongest result is recall; the pretrained model finds a large proportion of the annotated vehicles without dataset-specific training. Precision remains the main limitation, and the F1 score reflects the balance between these two metrics. These results establish a baseline rather than showing an improvement over another model.
 
-True negatives are undefined in this object-detection setup; consequently, ordinary classification accuracy would not be an appropriate summary metric. The precision, recall, and F1 values describe one confidence threshold, whereas AP summarizes performance across confidence levels.
+Precision is calculated as `TP / (TP + FP)`, recall as `TP / (TP + FN)`, and F1 as `2 × precision × recall / (precision + recall)`. The evaluator uses one-to-one box matching at the selected IoU threshold. True negatives are not defined in this object-detection setup, so ordinary classification accuracy is not reported.
+
+AP values and exact TP, FP, and FN counts were not included in the latest available summary; they should be copied from the completed run's saved metrics before submission if required. Rounded precision and recall alone are insufficient to reconstruct those counts.
+
+## Computational Efficiency Results
+
+| Measurement | Result | Scope |
+|---|---:|---|
+| Mean prediction-call latency | 10.94 ms/frame | Preprocessing, prediction, and postprocessing |
+| 95th-percentile prediction latency | 20.11 ms/frame | Approximately 95% of prediction calls finish within this time |
+| Mean frame-processing latency | 13.18 ms/frame | Image loading through predicted boxes copied to CPU |
+| Frame-processing throughput | 75.88 frames/sec | Timed frame-processing work |
+| Evaluation-loop throughput | 74.01 frames/sec | Includes matching and result-collection overhead |
+| Peak allocated GPU memory | Approximately 159 MiB | Peak PyTorch tensor allocation |
+| Peak reserved GPU memory | Approximately 216 MiB | Peak memory held by the PyTorch allocator |
+
+The average prediction call takes 10.94 ms; including image loading and copying boxes to CPU increases the average to 13.18 ms. The difference is approximately 2.24 ms per frame. Evaluation-loop throughput is slightly lower because the loop also performs metric-related work.
+
+The frame-processing throughput agrees with the mean latency: `1000 / 13.18 ≈ 75.87 FPS`. The small difference from 75.88 FPS is consistent with rounding. These measurements describe offline processing on the evaluated hardware; they do not include model startup or establish live-camera performance.
+
+### Measurement Procedure
+
+The script performs 10 warm-up predictions before collecting timing results. CUDA is synchronized around the timed prediction call so that elapsed wall-clock time includes completed GPU work. Python's `time.perf_counter()` measures elapsed time; latency is converted from seconds to milliseconds.
+
+For N evaluated frames, throughput is calculated as `N / sum(frame times in seconds)`. Prediction-call and frame-processing throughput use their corresponding timing boundaries. Evaluation-loop throughput uses the total elapsed loop time; it excludes model loading, annotation loading, warm-up, final AP computation, plotting, and file saving.
+
+After warm-up, the script resets PyTorch's CUDA peak-memory counters and records peak allocated and reserved memory during evaluation. The values include the resident model and are converted to MiB using `bytes / 1024²`. They do not measure total device memory usage; driver overhead, other applications, and some non-PyTorch allocations are outside this scope.
+
+These measurements quantify runtime and memory efficiency. **FLOPs/GFLOPs, energy consumption, and monetary cost have not been measured.** Latency is hardware dependent and should not be presented as an arithmetic-operation count.
 
 ## Positive Outcomes
 
-The most encouraging accuracy result is the precision of 84.44%. At the evaluated threshold, approximately 84 out of every 100 car predictions matched an annotated car. This suggests that the baseline produces relatively few false detections compared with its number of correct detections; however, this precision must be interpreted alongside the lower recall.
+I now have a baseline on sequential traffic data and a working path for loading MATLAB annotations. This supports a consistent comparison where YOLO26 receives one target frame and a temporal detector receives neighboring frames from the same sequence.
 
-The model also correctly detected 52,130 cars across the validation images. This demonstrates that the pretrained detector can provide a useful baseline on BDD100K without dataset-specific fine-tuning. AP50 reached 64.29%, which establishes a measurable reference for the next experiments. It does not represent an improvement because no alternative model has been evaluated under the same conditions yet.
+The baseline combines 84.83% recall with approximately 75.88 processed frames per second. This provides a useful reference for assessing whether the temporal model's detection gains justify additional processing time and memory. The updated evaluator also separates prediction latency from frame-processing latency; therefore, the comparison can account for pipeline overhead instead of relying only on model-forward timing.
 
-The reported mean inference time was 8.16 ms per image. Its reciprocal is approximately 122.5 images per second for model inference alone; this suggests a promising starting point for studying the cost of temporal processing. It does not establish end-to-end throughput because image loading, preprocessing, postprocessing, and other pipeline overhead are not included in that inference-only figure.
+## Limitations and Interpretation
 
-## Negative Results and Possible Explanations
+The current evaluator does not apply UA-DETRAC's separate ignore regions. Predictions inside those regions may be counted as false positives; therefore, the reported precision and F1 are custom evaluation scores rather than official UA-DETRAC benchmark scores. Ignore-region handling should be implemented consistently for both models before interpreting their final comparison.
 
-The main limitation is recall. The evaluator counted 50,376 false negatives and 52,130 true positives; thus, approximately 49.14% of the evaluated non-crowd cars were missed at the selected threshold. The F1 score of 63.48% reflects this imbalance between precision and recall. For traffic monitoring, missed vehicles can lead to incomplete counts and unreliable observations even when the detections that are produced are usually correct.
+The one-class vehicle mapping also needs care. YOLO's car, bus, and truck categories do not exactly reproduce UA-DETRAC's vehicle taxonomy. Combining them supports a practical vehicle-detection baseline; however, the results do not measure separate accuracy for cars, buses, vans, or other vehicle types.
 
-Possible explanations include small or distant cars, occlusion, low lighting, and differences between the model's pretraining data and BDD100K. BDD100K was designed to include varied geographic, environmental, and weather conditions [1]. However, the aggregate results do not identify which conditions caused the misses; I need to inspect false-negative examples and calculate results by object size and scene attributes before treating these explanations as established findings.
+Small vehicles, occlusion, lighting, and domain differences are possible sources of errors, but aggregate metrics do not establish their individual effects. I still need to inspect prediction examples and analyze performance by sequence and object size. Temporal consistency and detection flicker have not been quantified yet.
 
-AP decreased from 64.29% at IoU 0.50 to 38.31% at IoU 0.75, a difference of 25.98 percentage points. This indicates that performance is substantially weaker under stricter box-overlap requirements. It suggests that accurate localization is another limitation; however, the gap alone cannot distinguish localization errors from other factors such as small-object difficulty.
+Finally, sequential frames are correlated. Any training, validation, and test split must keep complete sequences separate to avoid neighboring-frame leakage. The `MVI_40` selection is a chosen subset; its results should not be generalized to the entire dataset without broader evaluation.
 
-During implementation, an attempt to process the full image list caused a CUDA out-of-memory error on the 8 GB GPU. The failed allocation requested 27.47 GiB. Changing inference to process one image at a time allowed the evaluation to complete. This was an input-batching problem rather than evidence that a single YOLO26m image requires that amount of memory. The successful run's peak GPU-memory usage has not yet been measured.
+## Earlier BDD100K Baseline
 
-## Connection to Temporal Detection Research
+| Measurement | Earlier BDD100K result |
+|---|---:|
+| Validation images | 10,000 |
+| Precision, car only | 84.44% |
+| Recall, car only | 50.86% |
+| F1 score, car only | 63.48% |
+| AP50 | 64.29% |
+| AP75 | 38.31% |
+| AP50–95 | 38.41% |
+| Mean model-forward time | 8.16 ms/image |
 
-TransVOD aggregates feature memories and object queries across frames and reports improvements over its Deformable DETR baseline on ImageNet VID [2]. Flow-Guided Feature Aggregation also reports benefits from combining neighboring-frame features, particularly for difficult fast-moving objects [3]. These studies support investigating temporal information; their reported gains cannot be transferred directly to this experiment because the datasets, architectures, and evaluation protocols differ.
-
-My current results identify recall and localization as areas to investigate. They do not prove that temporal information will resolve those limitations.
+These results document the earlier implementation stage. They are not directly comparable with the UA-DETRAC scores because the dataset and target-category mapping changed. The earlier 8.16 ms model-forward measurement also has a narrower timing scope than the current 10.94 ms prediction-call latency; their difference cannot be interpreted as a model slowdown.
 
 ## Next Steps
 
-I will first inspect representative false positives and false negatives, using the saved confusion matrix and precision–recall curve alongside annotated prediction examples. I will also analyze detection performance by car size, lighting, and occlusion where annotations support it.
+1. Add and verify ignore-region handling; confirm the exact sequence list, frame count, run settings, and hardware metadata.
+2. Inspect false positives and false negatives; summarize results by sequence and object size where supported.
+3. Implement the multi-frame comparison using TransVOD and evaluate exactly the same target frames with the same vehicle mapping and matching criteria.
+4. Measure both systems on the same hardware with matching precision, warm-up, and timing boundaries. Include reference-frame processing and disclose feature caching; report any delay caused by waiting for future frames.
+5. Compare detection quality against latency, target-frame throughput, and memory usage. Add GFLOPs separately if an operation-count comparison is required.
 
-Next, I will obtain the BDD100K MOT sequences or corresponding source videos. The 100k image release alone does not supply neighboring-frame windows. I will evaluate YOLO26 and TransVOD on exactly the same target frames and annotations; YOLO26 will receive one frame, while TransVOD will receive the target frame and its reference frames. Both will use the same car category and matching criteria.
+YOLO26 versus TransVOD compares two complete systems with different architectures and potentially different pretraining. It cannot isolate the effect of temporal input alone. A stronger controlled experiment would also compare TransVOD with its corresponding single-frame Deformable DETR baseline under matched training and evaluation conditions.
 
-A pretrained-model comparison will measure practical transfer performance, but different architectures and pretraining datasets prevent it from isolating the effect of temporal input. A stronger temporal ablation would compare a temporal detector against its corresponding single-frame baseline and, where feasible, fine-tune both using the same training sequences.
-
-Finally, I will measure full-pipeline latency, throughput, and peak GPU memory after warm-up. Centered windows also require future frames; their buffering delay should be reported separately from inference time. These measurements will allow me to assess whether any detection gains justify the additional systems cost.
-
-## References
-
-1. Yu et al. *BDD100K: A Diverse Driving Dataset for Heterogeneous Multitask Learning*. CVPR 2020. https://arxiv.org/abs/1805.04687
-2. He et al. *End-to-End Video Object Detection with Spatial-Temporal Transformers*. ACM Multimedia 2021. https://arxiv.org/abs/2105.10920
-3. Zhu et al. *Flow-Guided Feature Aggregation for Video Object Detection*. ICCV 2017. https://arxiv.org/abs/1703.10025
-
+At this stage, the single-frame detection and systems baseline is complete; the evidence does not yet establish whether multi-frame detection offers a better accuracy–efficiency trade-off.
